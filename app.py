@@ -9,7 +9,7 @@ import requests as rq
 st.set_page_config(page_title="Análise de Tickets", layout="wide")
 
 st.title("📊 Análise de Tickets e Desempenho de Agentes")
-st.markdown("Envie um arquivo `.csv` com as colunas **agente_email**, **qtd_motivos** e **tempo_medio_atendimento**.")
+st.markdown("Envie um arquivo `.csv` com as colunas **agente_email**, **qtd_motivos** e **tma_segundos**.")
 
 # Upload do arquivo
 uploaded_file = st.file_uploader("Escolha o arquivo CSV", type=["csv"])
