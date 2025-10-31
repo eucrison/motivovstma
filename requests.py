@@ -33,21 +33,21 @@ def load_data(uploaded_file):
 # ---------------------------------------------------------------
 def analyze_data(df):
     # Confere colunas obrigatórias
-    required_cols = {"agente_email", "qtd_motivos", "tempo_medio_atendimento"}
+    required_cols = {"agente_email", "qtd_motivos", "tma_segundos"}
     if not required_cols.issubset(df.columns):
         raise Exception(f"O arquivo deve conter as colunas: {', '.join(required_cols)}")
 
     # Conversões e limpeza
     df["qtd_motivos"] = pd.to_numeric(df["qtd_motivos"], errors="coerce").fillna(0)
-    df["tempo_medio_atendimento"] = pd.to_numeric(df["tempo_medio_atendimento"], errors="coerce").fillna(0)
+    df["tma_segundos"] = pd.to_numeric(df["tma_segundos"], errors="coerce").fillna(0)
 
     # Estatísticas gerais
     resumo_geral = {
         "Total de agentes": df["agente_email"].nunique(),
         "Total de tickets": int(df["qtd_motivos"].sum()),
-        "Tempo médio geral": round(df["tempo_medio_atendimento"].mean(), 2),
-        "Tempo máximo": round(df["tempo_medio_atendimento"].max(), 2),
-        "Tempo mínimo": round(df["tempo_medio_atendimento"].min(), 2),
+        "Tempo médio geral": round(df["tma_segundos"].mean(), 2),
+        "Tempo máximo": round(df["tma_segundos"].max(), 2),
+        "Tempo mínimo": round(df["tma_segundos"].min(), 2),
     }
 
     # Estatísticas por agente
@@ -55,7 +55,7 @@ def analyze_data(df):
         df.groupby("agente_email")
         .agg(
             qtd_tickets=("qtd_motivos", "sum"),
-            tempo_medio=("tempo_medio_atendimento", "mean"),
+            tempo_medio=("tma_segundos", "mean"),
         )
         .reset_index()
         .sort_values(by="tempo_medio", ascending=True)
@@ -81,7 +81,7 @@ def analyze_data(df):
     )
 
     # Tendências / insights
-    media_geral = df["tempo_medio_atendimento"].mean()
+    media_geral = df["tma_segundos"].mean()
     agentes_acima = por_agente[por_agente["tempo_medio"] > media_geral]
     agentes_abaixo = por_agente[por_agente["tempo_medio"] <= media_geral]
 
