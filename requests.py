@@ -107,11 +107,10 @@ def generate_insights(df):
     try:
         tickets_data = df.to_dict(orient="records")
         prompt = (
-            "Analise os dados de tickets e TMA abaixo e gere insights relevantes sobre padrões, gargalos, "
-            "diferenças entre agentes e oportunidades de melhoria.\n\n"
+
             f"Dados:\n{json.dumps(tickets_data, ensure_ascii=False)}"
         )
 
-        client = Groq(api_key="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")
+        client = Groq(api_key="")
 
         comple
