@@ -1,53 +1,48 @@
 # ================================================================
-# app.py
-# Interface Streamlit para análise de tickets e desempenho de agentes
+# app.py — Interface principal do Streamlit
 # ================================================================
 
 import streamlit as st
 import requests as rq
 
-st.set_page_config(page_title="Análise de Tickets", layout="wide")
+st.set_page_config(page_title="Análise de Tickets e TMA", layout="wide")
 
-st.title("📊 Análise de Tickets e Desempenho de Agentes")
-st.markdown("Envie um arquivo `.csv` com as colunas **agente_email**, **qtd_motivos** e **tma_segundos**.")
+# Menu lateral (sidebar)
+st.sidebar.title("📁 Upload de Arquivo")
+uploaded_file = st.sidebar.file_uploader("Escolha o arquivo CSV", type=["csv"])
 
-# Upload do arquivo
-uploaded_file = st.file_uploader("Escolha o arquivo CSV", type=["csv"])
+st.title("📊 Análise de Tickets e Tempo Médio de Atendimento (TMA)")
+st.markdown("Analise a relação entre o volume de tickets e o tempo médio de atendimento por agente.")
 
-if uploaded_file is not None:
+if uploaded_file:
     try:
         df = rq.load_data(uploaded_file)
-
         st.success("✅ Arquivo carregado com sucesso!")
         st.dataframe(df.head())
 
-        resumo_geral, por_agente, fig_qtd, fig_tempo, insights = rq.analyze_data(df)
+        resumo_geral, por_agente, fig_disp = rq.analyze_data(df)
 
-        # Exibe resumo geral
+        # Resumo geral
         st.subheader("📋 Resumo Geral")
         for k, v in resumo_geral.items():
             st.write(f"**{k}:** {v}")
 
-        # Exibe gráficos
-        st.subheader("📈 Quantidade de Tickets por Agente")
-        st.plotly_chart(fig_qtd, use_container_width=True)
+        # Gráfico de dispersão
+        st.subheader("📈 Relação Volume x Tempo Médio")
+        st.plotly_chart(fig_disp, use_container_width=True)
 
-        st.subheader("⏱️ Tempo Médio de Atendimento por Agente")
-        st.plotly_chart(fig_tempo, use_container_width=True)
-
-        # Exibe tabela detalhada
+        # Tabela detalhada
         st.subheader("📊 Desempenho por Agente")
-        st.dataframe(por_agente, use_container_width=True)
+        st.dataframe(por_agente[["agente_email", "qtd_tickets", "tma_formatado"]], use_container_width=True)
 
-        # Exibe insights
-        st.subheader("💡 Insights")
-        st.info(insights["ponto_positivo"])
-        st.warning(insights["ponto_atencao"])
-        st.success(f"🏅 Melhor desempenho: {insights['melhor_agente']}")
-        st.error(f"⚠️ Maior tempo médio: {insights['pior_agente']}")
+        # Insights automáticos via Groq
+        st.subheader("💡 Insights (Gerados por IA via Groq API)")
+        with st.spinner("Gerando insights inteligentes..."):
+            insights = rq.generate_insights(df)
+            st.write(insights)
 
     except Exception as e:
         st.error(f"Erro ao processar o arquivo: {e}")
-else:
-    st.info("Por favor, envie um arquivo CSV para iniciar a análise.")
 
+else:
+    st.info("Envie um arquivo CSV no menu lateral para iniciar a análise.")
