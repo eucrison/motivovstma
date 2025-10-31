@@ -1,20 +1,40 @@
 # ================================================================
-# requests.py
-# Módulo de leitura, limpeza, análise e visualização de dados
+# requests.py — funções de leitura, análise e integração com Groq
 # ================================================================
 
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import json
+from groq import Groq
+
 
 # ---------------------------------------------------------------
-# Função para carregar o CSV com detecção automática
+# Função: converter segundos em formato D:H:M:S
+# ---------------------------------------------------------------
+def format_seconds(total_seconds):
+    total_seconds = int(total_seconds)
+    days = total_seconds // 86400
+    hours = (total_seconds % 86400) // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+    if days > 0:
+        return f"{days}d {hours}h {minutes}m {seconds}s"
+    elif hours > 0:
+        return f"{hours}h {minutes}m {seconds}s"
+    elif minutes > 0:
+        return f"{minutes}m {seconds}s"
+    else:
+        return f"{seconds}s"
+
+
+# ---------------------------------------------------------------
+# Função: carregar dados do CSV
 # ---------------------------------------------------------------
 def load_data(uploaded_file):
     if uploaded_file is None:
         return None
 
-    # Tenta detectar separador e encoding
     try:
         df = pd.read_csv(uploaded_file, sep=None, engine="python")
     except UnicodeDecodeError:
@@ -23,21 +43,18 @@ def load_data(uploaded_file):
     except Exception as e:
         raise Exception(f"Erro ao ler o arquivo: {e}")
 
-    # Normaliza nomes de colunas
     df.columns = [c.strip().lower() for c in df.columns]
     return df
 
 
 # ---------------------------------------------------------------
-# Função principal de análise
+# Função: análise principal dos dados
 # ---------------------------------------------------------------
 def analyze_data(df):
-    # Confere colunas obrigatórias
     required_cols = {"agente_email", "qtd_motivos", "tma_segundos"}
     if not required_cols.issubset(df.columns):
         raise Exception(f"O arquivo deve conter as colunas: {', '.join(required_cols)}")
 
-    # Conversões e limpeza
     df["qtd_motivos"] = pd.to_numeric(df["qtd_motivos"], errors="coerce").fillna(0)
     df["tma_segundos"] = pd.to_numeric(df["tma_segundos"], errors="coerce").fillna(0)
 
@@ -45,9 +62,9 @@ def analyze_data(df):
     resumo_geral = {
         "Total de agentes": df["agente_email"].nunique(),
         "Total de tickets": int(df["qtd_motivos"].sum()),
-        "Tempo médio geral": round(df["tma_segundos"].mean(), 2),
-        "Tempo máximo": round(df["tma_segundos"].max(), 2),
-        "Tempo mínimo": round(df["tma_segundos"].min(), 2),
+        "TMA médio geral": format_seconds(df["tma_segundos"].mean()),
+        "TMA máximo": format_seconds(df["tma_segundos"].max()),
+        "TMA mínimo": format_seconds(df["tma_segundos"].min()),
     }
 
     # Estatísticas por agente
@@ -55,42 +72,46 @@ def analyze_data(df):
         df.groupby("agente_email")
         .agg(
             qtd_tickets=("qtd_motivos", "sum"),
-            tempo_medio=("tma_segundos", "mean"),
+            tma_medio=("tma_segundos", "mean"),
         )
         .reset_index()
-        .sort_values(by="tempo_medio", ascending=True)
     )
 
-    # Gráficos (usando Plotly Express)
-    fig_qtd = px.bar(
-        por_agente,
-        x="agente_email",
-        y="qtd_tickets",
-        title="Quantidade de Tickets por Agente",
-        color="qtd_tickets",
-        color_continuous_scale="Blues",
-    )
+    por_agente["tma_formatado"] = por_agente["tma_medio"].apply(format_seconds)
 
-    fig_tempo = px.bar(
+    # Gráfico de dispersão
+    fig_disp = px.scatter(
         por_agente,
-        x="agente_email",
-        y="tempo_medio",
-        title="Tempo Médio de Atendimento por Agente",
-        color="tempo_medio",
+        x="qtd_tickets",
+        y="tma_medio",
+        hover_data=["agente_email"],
+        color="tma_medio",
         color_continuous_scale="Viridis",
+        title="Relação entre Volume de Tickets e Tempo Médio de Atendimento",
+        labels={
+            "qtd_tickets": "Quantidade de Tickets",
+            "tma_medio": "Tempo Médio (segundos)",
+        },
     )
 
-    # Tendências / insights
-    media_geral = df["tma_segundos"].mean()
-    agentes_acima = por_agente[por_agente["tempo_medio"] > media_geral]
-    agentes_abaixo = por_agente[por_agente["tempo_medio"] <= media_geral]
+    # Ordena para visualização
+    por_agente = por_agente.sort_values(by="tma_medio", ascending=True)
 
-    insights = {
-        "ponto_positivo": f"{len(agentes_abaixo)} agentes estão com tempo médio abaixo da média geral ({media_geral:.2f}).",
-        "ponto_atencao": f"{len(agentes_acima)} agentes estão com tempo médio acima da média geral ({media_geral:.2f}).",
-        "melhor_agente": por_agente.iloc[0]["agente_email"],
-        "pior_agente": por_agente.iloc[-1]["agente_email"],
-    }
+    return resumo_geral, por_agente, fig_disp
 
-    return resumo_geral, por_agente, fig_qtd, fig_tempo, insights
 
+# ---------------------------------------------------------------
+# Função: gerar insights via API da Groq
+# ---------------------------------------------------------------
+def generate_insights(df):
+    try:
+        tickets_data = df.to_dict(orient="records")
+        prompt = (
+            "Analise os dados de tickets e TMA abaixo e gere insights relevantes sobre padrões, gargalos, "
+            "diferenças entre agentes e oportunidades de melhoria.\n\n"
+            f"Dados:\n{json.dumps(tickets_data, ensure_ascii=False)}"
+        )
+
+        client = Groq(api_key="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")
+
+        comple
